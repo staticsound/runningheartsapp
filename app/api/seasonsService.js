@@ -10,7 +10,9 @@
       getLatestSeason,
       getSeason,
       getSeasons,
-      startNewSeason
+      startNewSeason,
+      getSeasonByEventDate,
+      persistSeason
     };
 
     function getLatestSeason() {
@@ -54,6 +56,31 @@
 
     }
 
+    function getSeasonByEventDate(date) {
+      return new Promise((resolve, reject) => {
+        Season
+          .find({
+            startDate: {
+              $lte: date
+            },
+            $or: [ {
+              endDate: {
+                $gte: date
+              }
+            }, {
+              endDate: null
+            }]
+          })
+          .exec((err, season) => {
+            if (err) {
+              LOG.error(err.stack);
+              return reject(err);
+            }
+            return resolve(season.pop())
+        });
+      });
+    }
+
     function startNewSeason(seasonNumber) {
       return new Promise((resolve, reject) => {
         var time = moment().startOf('day').format();
@@ -85,7 +112,27 @@
 
       });
 
+    }
 
+    function persistSeason(season) {
+      return new Promise((resolve, reject) => {
+        Season
+          .findOneAndUpdate({
+            seasonNumber: season.seasonNumber
+          }, {
+            $set: {
+              mainEventId: season.mainEventId
+            }
+          })
+          .exec((err) => {
+            if (err) {
+              LOG.error(err.stack);
+              return reject(err);
+            }
+            return resolve({})
+          })
+
+      })
     }
 
     return service;

@@ -4,30 +4,47 @@
 
   angular.module(APP_NAME).controller('eventsViewCtrl', eventsViewCtrl);
 
-  eventsViewCtrl.$inject = ['$state', '$stateParams', 'eventsService', 'gamesService', 'dialogService', 'errorService'];
+  eventsViewCtrl.$inject = ['$state', '$stateParams', 'eventsService', 'gamesService', 'dialogService', 'seasonsService', 'errorService'];
 
-  function eventsViewCtrl($state, $stateParams, eventsService, gamesService, dialogService, errorService) {
+  function eventsViewCtrl($state, $stateParams, eventsService, gamesService, dialogService, seasonsService, errorService) {
 
     var vm = this;
 
     vm.getEvent = function(id) {
       vm.event = eventsService.api(id).get(() => {
         vm.event.isToday = moment().isSame(vm.event.date, 'd');
+        vm.event.season = seasonsService.api().byEventDate({date: vm.event.date});
       });
     };
 
     vm.removeEvent = function(event) {
       dialogService.confirm('Are you sure you want to delete this event?').then(() => {
         eventsService.api(event._id).remove(function() {
+          if (event.statusId === 3) {
+            vm.event.season.mainEventId = null;
+            seasonsService.api(vm.event.season.seasonNumber).update(vm.event.season)
+          }
           $state.go('events.list');
         });
       });
     };
 
+    vm.makeMainEvent = function(event) {
+      dialogService.confirm('Are you sure you want to make this the main event?').then(() => {
+        event.statusId = 3
+        eventsService.api().save(event);
+        vm.event.season.mainEventId = event._id;
+        seasonsService.api(vm.event.season.seasonNumber).update(vm.event.season);
+        });
+    }
+
     vm.newGame = function() {
       vm.game = {
         event: vm.event,
         number: vm.event.games.length + 1
+      };
+      if (vm.event.statusId === 3) {
+        vm.game.statusId = 3
       };
       gamesService.api().create(vm.game, function(game) {
         vm.viewGame(game);
